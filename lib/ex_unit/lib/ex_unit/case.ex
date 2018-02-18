@@ -126,14 +126,15 @@ defmodule ExUnit.Case do
   The following tags are set automatically by ExUnit and are
   therefore reserved:
 
-    * `:module`     - the module on which the test was defined
-    * `:file`       - the file on which the test was defined
-    * `:line`       - the line on which the test was defined
-    * `:test`       - the test name
-    * `:type`       - the type of the test (`:test`, `:doctest`, `:property`, etc)
-    * `:async`      - if the test case is in async mode
-    * `:registered` - used for `ExUnit.Case.register_attribute/3` values
-    * `:describe`   - the describe block the test belongs to
+    * `:module`          - the module on which the test was defined
+    * `:file`            - the file on which the test was defined
+    * `:line`            - the line on which the test was defined
+    * `:test`            - the test name
+    * `:type`            - the type of the test (`:test`, `:doctest`, `:property`, etc)
+    * `:async`           - if the test case is in async mode
+    * `:registered`      - used for `ExUnit.Case.register_attribute/3` values
+    * `:describe`        - the describe block the test belongs to
+    * `:last_run_status` - status (`:passed`, `:failed`, or `:unknown`) from the test's last run
 
   The following tags customize how tests behave:
 
@@ -189,7 +190,17 @@ defmodule ExUnit.Case do
       config :logger, backends: []
   """
 
-  @reserved [:module, :file, :line, :test, :async, :registered, :describe, :type]
+  @reserved [
+    :module,
+    :file,
+    :line,
+    :test,
+    :async,
+    :registered,
+    :describe,
+    :type,
+    :last_run_status
+  ]
 
   @doc false
   defmacro __using__(opts) do

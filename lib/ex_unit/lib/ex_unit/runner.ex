@@ -8,7 +8,7 @@ defmodule ExUnit.Runner do
   def run(opts, load_us) do
     {:ok, manager} = EM.start_link()
     {:ok, stats} = EM.add_handler(manager, ExUnit.RunnerStats, opts)
-    {opts, config} = configure(manager, opts)
+    {opts, config} = configure(manager, stats, opts)
 
     :erlang.system_flag(:backtrace_depth, Keyword.fetch!(opts, :stacktrace_depth))
 
@@ -24,7 +24,7 @@ defmodule ExUnit.Runner do
     result
   end
 
-  defp configure(manager, opts) do
+  defp configure(manager, stats, opts) do
     opts = normalize_opts(opts)
     Enum.each(opts[:formatters], &EM.add_handler(manager, &1, opts))
 
@@ -37,7 +37,8 @@ defmodule ExUnit.Runner do
       seed: opts[:seed],
       modules: :async,
       timeout: opts[:timeout],
-      trace: opts[:trace]
+      trace: opts[:trace],
+      last_run_status_index: ExUnit.RunnerStats.last_run_status_index(stats)
     }
 
     {opts, config}
@@ -132,9 +133,16 @@ defmodule ExUnit.Runner do
     tests = shuffle(config, tests)
     include = config.include
     exclude = config.exclude
+    last_run_status_index = config.last_run_status_index
 
-    for test <- tests do
-      tags = Map.merge(test.tags, %{test: test.name, module: test.module})
+    for %{name: name, module: module} = test <- tests do
+      updates = %{
+        test: name,
+        module: module,
+        last_run_status: Map.get(last_run_status_index, {module, name}, :unknown)
+      }
+
+      tags = Map.merge(test.tags, updates)
 
       case ExUnit.Filters.eval(include, exclude, tags, tests) do
         :ok -> %{test | tags: tags}

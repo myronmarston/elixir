@@ -41,6 +41,14 @@ defmodule ExUnit.RunnerStatsTest do
         assert File.ls(".") == {:ok, []}
       end)
     end
+
+    test "provides an empty last_run_status_index", context do
+      in_tmp(context.test, fn ->
+        simulate_suite([], fn formatter ->
+          assert RunnerStats.last_run_status_index(formatter) == %{}
+        end)
+      end)
+    end
   end
 
   describe "when a manifest path option is provided" do
@@ -67,6 +75,24 @@ defmodule ExUnit.RunnerStatsTest do
                  {{TestModule, :test_1}, entry(file: __ENV__.file, last_run_status: :passed)},
                  {{TestModule, :test_2}, entry(file: __ENV__.file, last_run_status: :failed)}
                ]
+      end)
+    end
+
+    test "provides access to an index of last run statuses from the prior run", context do
+      in_tmp(context.test, fn ->
+        simulate_suite(fn formatter ->
+          simulate_test(formatter, :test_1, :passed)
+          simulate_test(formatter, :test_2, :failed)
+        end)
+
+        simulate_suite(fn formatter ->
+          simulate_test(formatter, :test_3, :failed)
+
+          assert RunnerStats.last_run_status_index(formatter) == %{
+                   {TestModule, :test_1} => :passed,
+                   {TestModule, :test_2} => :failed
+                 }
+        end)
       end)
     end
   end

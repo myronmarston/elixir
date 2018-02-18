@@ -4,6 +4,7 @@ defmodule ExUnitTest do
   use ExUnit.Case
 
   import ExUnit.CaptureIO
+  import ExUnit.TestHelpers, only: [in_tmp: 2]
 
   test "supports many runs" do
     defmodule SampleTest do
@@ -136,7 +137,9 @@ defmodule ExUnitTest do
     assert config[:max_cases] == 1
   end
 
-  test "filtering cases with tags" do
+  test "filtering cases with tags", context do
+    on_exit_reload_config()
+
     defmodule ParityTest do
       use ExUnit.Case
 
@@ -152,26 +155,42 @@ defmodule ExUnitTest do
       test "three", do: :ok
     end
 
-    # Empty because it is already loaded
-    {result, output} = run_with_filter([], [])
-    assert result == %{failures: 1, skipped: 0, total: 4, excluded: 0}
-    assert output =~ "4 tests, 1 failure"
+    in_tmp(context.test, fn ->
+      ExUnit.configure(manifest_path: Path.join(File.cwd!(), "manifests"))
 
-    {result, output} = run_with_filter([exclude: [even: true]], [ParityTest])
-    assert result == %{failures: 0, skipped: 0, excluded: 1, total: 4}
-    assert output =~ "4 tests, 0 failures, 1 excluded"
+      # Empty because it is already loaded
+      {result, output} = run_with_filter([], [])
+      assert result == %{failures: 1, skipped: 0, total: 4, excluded: 0}
+      assert output =~ "4 tests, 1 failure"
 
-    {result, output} = run_with_filter([exclude: :even], [ParityTest])
-    assert result == %{failures: 0, skipped: 0, excluded: 3, total: 4}
-    assert output =~ "4 tests, 0 failures, 3 excluded"
+      {result, output} = run_with_filter([exclude: [even: true]], [ParityTest])
+      assert result == %{failures: 0, skipped: 0, excluded: 1, total: 4}
+      assert output =~ "4 tests, 0 failures, 1 excluded"
 
-    {result, output} = run_with_filter([exclude: :even, include: [even: true]], [ParityTest])
-    assert result == %{failures: 1, skipped: 0, excluded: 2, total: 4}
-    assert output =~ "4 tests, 1 failure, 2 excluded"
+      {result, output} = run_with_filter([exclude: :even], [ParityTest])
+      assert result == %{failures: 0, skipped: 0, excluded: 3, total: 4}
+      assert output =~ "4 tests, 0 failures, 3 excluded"
 
-    {result, output} = run_with_filter([exclude: :test, include: [even: true]], [ParityTest])
-    assert result == %{failures: 1, skipped: 0, excluded: 3, total: 4}
-    assert output =~ "4 tests, 1 failure, 3 excluded"
+      {result, output} = run_with_filter([exclude: :even, include: [even: true]], [ParityTest])
+      assert result == %{failures: 1, skipped: 0, excluded: 2, total: 4}
+      assert output =~ "4 tests, 1 failure, 2 excluded"
+
+      {result, output} = run_with_filter([exclude: :test, include: [even: true]], [ParityTest])
+      assert result == %{failures: 1, skipped: 0, excluded: 3, total: 4}
+      assert output =~ "4 tests, 1 failure, 3 excluded"
+
+      {result, output} =
+        run_with_filter([exclude: :test, include: [last_run_status: :failed]], [ParityTest])
+
+      assert result == %{failures: 1, skipped: 0, excluded: 3, total: 4}
+      assert output =~ "4 tests, 1 failure, 3 excluded"
+
+      {result, output} =
+        run_with_filter([exclude: :test, include: [last_run_status: :passed]], [ParityTest])
+
+      assert result == %{failures: 0, skipped: 0, excluded: 1, total: 4}
+      assert output =~ "4 tests, 0 failures, 1 excluded"
+    end)
   end
 
   test "log capturing" do

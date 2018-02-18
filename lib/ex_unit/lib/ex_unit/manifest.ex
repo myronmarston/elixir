@@ -8,6 +8,7 @@ defmodule ExUnit.Manifest do
   @type status :: :passed | :failed
   @type entry :: record(:entry, last_run_status: status, file: Path.t())
   @type test_id :: {module, name :: atom}
+  @type last_run_status_index :: %{test_id => status}
 
   @manifest_vsn 1
 
@@ -16,7 +17,18 @@ defmodule ExUnit.Manifest do
     []
   end
 
+  @spec to_last_run_status_index(t) :: last_run_status_index
+  def to_last_run_status_index(manifest) do
+    Map.new(manifest, fn {test_id, entry(last_run_status: status)} ->
+      {test_id, status}
+    end)
+  end
+
   @spec add_test(t, ExUnit.Test.t()) :: t
+  def add_test(manifest, %ExUnit.Test{tags: %{file: file}})
+      when not is_binary(file),
+      do: manifest
+
   def add_test(manifest, %ExUnit.Test{state: {ignored_state, _}})
       when ignored_state in [:skipped, :excluded],
       do: manifest

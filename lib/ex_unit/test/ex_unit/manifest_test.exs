@@ -6,7 +6,27 @@ defmodule ExUnit.ManifestTest do
   import ExUnit.Manifest
   import ExUnit.TestHelpers, only: [tmp_path: 0, in_tmp: 2]
 
+  describe "to_last_run_status_index/1" do
+    test "converts the manifest to an index of statuses keyed by test id" do
+      manifest = [
+        {{TestMod1, :test_1}, entry(last_run_status: :failed, file: "file_1")},
+        {{TestMod1, :test_2}, entry(last_run_status: :passed, file: "file_1")}
+      ]
+
+      assert to_last_run_status_index(manifest) == %{
+               {TestMod1, :test_1} => :failed,
+               {TestMod1, :test_2} => :passed
+             }
+    end
+  end
+
   describe "add_test/2" do
+    test "ignores tests that have an invalid :file value (which can happen when returning a `:file` option from `setup`))" do
+      test = %ExUnit.Test{state: nil, tags: %{file: :not_a_file}}
+
+      assert add_test(new(), test) == new()
+    end
+
     test "ignores skipped tests since we know nothing about their pass/fail status" do
       test = %ExUnit.Test{state: {:skipped, "reason"}}
 
