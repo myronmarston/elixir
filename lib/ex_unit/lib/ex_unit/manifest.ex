@@ -11,6 +11,18 @@ defmodule ExUnit.Manifest do
     []
   end
 
+  @spec files_with_failures(t) :: MapSet.t(Path.t())
+  def files_with_failures(manifest) do
+    for({_, file} <- manifest, do: file, uniq: true)
+    |> MapSet.new()
+  end
+
+  @spec failed_test_ids(t) :: MapSet.t(test_id)
+  def failed_test_ids(manifest) do
+    for({test_id, _} <- manifest, do: test_id)
+    |> MapSet.new()
+  end
+
   @spec add_test(t, ExUnit.Test.t()) :: t
   def add_test(manifest, %ExUnit.Test{tags: %{file: file}})
       when not is_binary(file),

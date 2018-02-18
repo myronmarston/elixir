@@ -6,6 +6,32 @@ defmodule ExUnit.ManifestTest do
   import ExUnit.Manifest
   import ExUnit.TestHelpers, only: [tmp_path: 0, in_tmp: 2]
 
+  describe "files_with_failures/1" do
+    test "returns a set of the files that have failures" do
+      manifest = [
+        {{TestMod1, :test_1}, "file_1"},
+        {{TestMod1, :test_2}, "file_1"},
+        {{TestMod3, :test_1}, "file_2"}
+      ]
+
+      assert files_with_failures(manifest) == MapSet.new(["file_1", "file_2"])
+    end
+  end
+
+  describe "failed_test_ids/1" do
+    test "returns the set of test ids" do
+      manifest = [
+        {{TestMod1, :test_1}, "file_1.exs"},
+        {{TestMod1, :test_2}, "file_2.exs"}
+      ]
+
+      assert failed_test_ids(manifest) == MapSet.new([
+               {TestMod1, :test_1},
+               {TestMod1, :test_2}
+             ])
+    end
+  end
+
   describe "add_test/2" do
     test "ignores tests that have an invalid :file value (which can happen when returning a `:file` option from `setup`))" do
       test = %ExUnit.Test{state: nil, tags: %{file: :not_a_file}}

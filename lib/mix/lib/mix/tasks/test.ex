@@ -75,6 +75,7 @@ defmodule Mix.Tasks.Test do
       Automatically sets `--trace` and `--preload-modules`
     * `--stale` - runs only tests which reference modules that changed since the
       last `test --stale`. You can read more about this option in the "Stale" section below.
+    * `--failed` - runs only tests that failed the last time they ran
     * `--timeout` - sets the timeout for the tests
     * `--trace` - runs tests with detailed reporting; automatically sets `--max-cases` to 1
 
@@ -188,6 +189,7 @@ defmodule Mix.Tasks.Test do
     deps_check: :boolean,
     archives_check: :boolean,
     elixir_version_check: :boolean,
+    failed: :boolean,
     stale: :boolean,
     listen_on_stdin: :boolean,
     formatter: :keep,
@@ -262,6 +264,8 @@ defmodule Mix.Tasks.Test do
     warn_test_pattern = project[:warn_test_pattern] || "*_test.ex"
 
     matched_test_files = Mix.Utils.extract_files(test_files, test_pattern)
+    {opts, matched_test_files} = process_failed_option(opts, ex_unit_opts, matched_test_files)
+
     display_warn_test_pattern(test_files, test_pattern, matched_test_files, warn_test_pattern)
 
     case CT.require_and_run(matched_test_files, test_paths, opts) do
@@ -308,6 +312,23 @@ defmodule Mix.Tasks.Test do
     else
       Mix.shell().error(message)
       System.at_exit(fn _ -> exit({:shutdown, 1}) end)
+    end
+  end
+
+  defp process_failed_option(opts, ex_unit_opts, matched_test_files) do
+    if opts[:failed] do
+      {files_with_failures, failed_ids} =
+        ExUnit.Filters.failure_info(ex_unit_opts[:manifest_file])
+
+      opts = Keyword.put(opts, :only_test_ids, failed_ids)
+      matched_test_files = Enum.filter(
+        matched_test_files,
+        &MapSet.member?(files_with_failures, &1)
+      )
+
+      {opts, matched_test_files}
+    else
+      {opts, matched_test_files}
     end
   end
 
