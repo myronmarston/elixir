@@ -4,7 +4,9 @@ defmodule ExUnit.Manifest do
   import Record
 
   defrecord :entry, [:last_run_status, :file]
-  @opaque t :: [{test_id, entry}]
+  defstruct entries: [], dir: nil
+
+  @opaque t :: %__MODULE__{entries: [{test_id, entry}], dir: Path.t()}
   @type status :: :passed | :failed
   @type entry :: record(:entry, last_run_status: status, file: Path.t())
   @type test_id :: {module, name :: atom}
@@ -12,16 +14,23 @@ defmodule ExUnit.Manifest do
 
   @manifest_vsn 1
 
-  @spec new() :: t
-  def new do
-    []
+  @spec new(Path.t()) :: t
+  def new(dir) do
+    %__MODULE__{dir: dir}
   end
 
   @spec to_last_run_status_index(t) :: last_run_status_index
-  def to_last_run_status_index(manifest) do
-    Map.new(manifest, fn {test_id, entry(last_run_status: status)} ->
+  def to_last_run_status_index(%__MODULE__{entries: entries}) do
+    Map.new(entries, fn {test_id, entry(last_run_status: status)} ->
       {test_id, status}
     end)
+  end
+
+  @spec get_files_with_failures(t) :: MapSet.t(Path.t())
+  def get_files_with_failures(%__MODULE__{entries: entries}) do
+    entries
+    |> Stream.filter(fn {_, entry(last_run_status: status)} -> status == :failed end)
+    |> MapSet.new(fn {_, entry(file: file)} -> file end)
   end
 
   @spec add_test(t, ExUnit.Test.t()) :: t
@@ -42,23 +51,25 @@ defmodule ExUnit.Manifest do
       end
 
     entry = entry(last_run_status: status, file: test.tags.file)
-    [{{test.module, test.name}, entry} | manifest]
+    update_in(manifest.entries, &[{{test.module, test.name}, entry} | &1])
   end
 
-  @spec write!(t, Path.t()) :: :ok
-  def write!(manifest, file) when is_binary(file) do
-    binary = :erlang.term_to_binary({@manifest_vsn, manifest})
-    Path.dirname(file) |> File.mkdir_p!()
-    File.write!(file, binary)
+  @file_name ".ex_unit_results.elixir"
+
+  @spec write!(t) :: :ok
+  def write!(%__MODULE__{dir: dir} = manifest) do
+    binary = :erlang.term_to_binary({@manifest_vsn, manifest.entries})
+    File.mkdir_p!(dir)
+    dir |> Path.join(@file_name) |> File.write!(binary)
   end
 
   @spec read(Path.t()) :: t
-  def read(file) when is_binary(file) do
-    with {:ok, binary} <- File.read(file),
-         {:ok, {@manifest_vsn, manifest}} when is_list(manifest) <- safe_binary_to_term(binary) do
-      manifest
+  def read(dir) when is_binary(dir) do
+    with {:ok, binary} <- File.read(Path.join(dir, @file_name)),
+         {:ok, {@manifest_vsn, entries}} when is_list(entries) <- safe_binary_to_term(binary) do
+      %__MODULE__{entries: entries, dir: dir}
     else
-      _ -> new()
+      _ -> new(dir)
     end
   end
 
@@ -84,8 +95,10 @@ defmodule ExUnit.Manifest do
   #      test modules that have been loaded.
   #
   @spec merge(t, t) :: t
-  def merge(old_manifest, new_manifest) do
-    prune_and_merge(old_manifest, Map.new(new_manifest), %{}, new_manifest)
+  def merge(%__MODULE__{entries: old_entries}, %__MODULE__{} = new_manifest) do
+    new_entries = new_manifest.entries
+    merged_entries = prune_and_merge(old_entries, Map.new(new_entries), %{}, new_entries)
+    put_in(new_manifest.entries, merged_entries)
   end
 
   defp prune_and_merge([], _, _, acc), do: acc

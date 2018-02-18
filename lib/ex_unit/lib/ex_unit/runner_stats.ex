@@ -14,25 +14,17 @@ defmodule ExUnit.RunnerStats do
 
   # Callbacks
 
-  @manifest ".ex_unit_results.elixir"
-
   def init(opts) do
-    send(self(), :load_old_manifest)
-
-    manifest_file =
-      case Keyword.fetch(opts, :manifest_path) do
-        :error -> nil
-        {:ok, manifest_path} -> Path.join(manifest_path, @manifest)
-      end
+    manifest_path = Keyword.get(opts, :manifest_path)
+    send(self(), {:load_old_manifest, manifest_path})
 
     state = %{
       total: 0,
       failures: 0,
       skipped: 0,
       excluded: 0,
-      manifest_file: manifest_file,
       old_manifest: nil,
-      new_manifest: Manifest.new()
+      new_manifest: Manifest.new(manifest_path)
     }
 
     {:ok, state}
@@ -67,10 +59,11 @@ defmodule ExUnit.RunnerStats do
     {:noreply, %{state | failures: failures + test_count, total: total + test_count}}
   end
 
-  def handle_cast({:suite_finished, _, _}, %{manifest_file: file} = state) when is_binary(file) do
-    state.old_manifest
+  def handle_cast({:suite_finished, _, _}, %{old_manifest: old_manifest} = state)
+      when old_manifest != nil do
+    old_manifest
     |> Manifest.merge(state.new_manifest)
-    |> Manifest.write!(file)
+    |> Manifest.write!()
 
     {:noreply, state}
   end
@@ -79,9 +72,9 @@ defmodule ExUnit.RunnerStats do
     {:noreply, state}
   end
 
-  def handle_info(:load_old_manifest, %{old_manifest: nil, manifest_file: file} = state)
-      when is_binary(file) do
-    state = %{state | old_manifest: Manifest.read(file)}
+  def handle_info({:load_old_manifest, dir}, %{old_manifest: nil} = state)
+      when is_binary(dir) do
+    state = %{state | old_manifest: Manifest.read(dir)}
     {:noreply, state}
   end
 

@@ -67,6 +67,7 @@ defmodule Mix.Tasks.Test do
     * `--no-elixir-version-check` - does not check the Elixir version from mix.exs
     * `--no-start` - does not start applications after compilation
     * `--only` - runs only tests that match the filter
+    * `--only-failures` - runs only tests that failed the last time they ran
     * `--preload-modules` - preloads all modules defined in applications
     * `--raise` - raises if the test suite failed
     * `--seed` - seeds the random number generator used to randomize tests order;
@@ -181,6 +182,7 @@ defmodule Mix.Tasks.Test do
     exclude: :keep,
     seed: :integer,
     only: :keep,
+    only_failures: :boolean,
     compile: :boolean,
     start: :boolean,
     timeout: :integer,
@@ -261,7 +263,11 @@ defmodule Mix.Tasks.Test do
     test_pattern = project[:test_pattern] || "*_test.exs"
     warn_test_pattern = project[:warn_test_pattern] || "*_test.ex"
 
-    matched_test_files = Mix.Utils.extract_files(test_files, test_pattern)
+    matched_test_files =
+      test_files
+      |> Mix.Utils.extract_files(test_pattern)
+      |> filter_test_files_based_on_opts(opts)
+
     display_warn_test_pattern(test_files, test_pattern, matched_test_files, warn_test_pattern)
 
     case CT.require_and_run(matched_test_files, test_paths, opts) do
@@ -311,6 +317,22 @@ defmodule Mix.Tasks.Test do
     end
   end
 
+  defp filter_test_files_based_on_opts(files, opts) do
+    if opts[:only_failures] do
+      # Strictly speaking, we don't have to filter the files to satisfy the user's
+      # request to run only failures, but the test run will finish faster if we
+      # avoid loading files that have no failures, so we filter them here.
+      files_with_failures =
+        Mix.Project.manifest_path()
+        |> ExUnit.Manifest.read()
+        |> ExUnit.Manifest.get_files_with_failures()
+
+      Enum.filter(files, &MapSet.member?(files_with_failures, Path.expand(&1)))
+    else
+      files
+    end
+  end
+
   defp display_warn_test_pattern(test_files, test_pattern, matched_test_files, warn_test_pattern) do
     files = Mix.Utils.extract_files(test_files, warn_test_pattern) -- matched_test_files
 
@@ -339,6 +361,7 @@ defmodule Mix.Tasks.Test do
     opts
     |> filter_opts(:include)
     |> filter_opts(:exclude)
+    |> filter_opts(:only_failures)
     |> filter_opts(:only)
     |> formatter_opts()
     |> manifest_opts()
@@ -384,6 +407,16 @@ defmodule Mix.Tasks.Test do
       opts
       |> Keyword.update(:include, filters, &(filters ++ &1))
       |> Keyword.update(:exclude, [:test], &[:test | &1])
+    else
+      opts
+    end
+  end
+
+  defp filter_opts(opts, :only_failures) do
+    {only_failures, opts} = Keyword.pop(opts, :only_failures)
+
+    if only_failures do
+      Keyword.put(opts, :only, "last_run_status:failed")
     else
       opts
     end

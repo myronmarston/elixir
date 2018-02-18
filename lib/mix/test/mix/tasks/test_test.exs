@@ -117,6 +117,23 @@ defmodule Mix.Tasks.TestTest do
     end
   end
 
+  test "--only-failures: loads only files with failures and runs just the failures" do
+    in_fixture "test_only_failures", fn ->
+      output = mix(["test"])
+
+      loading_only_passing_test_msg = "loading OnlyPassingTest"
+
+      assert output =~ loading_only_passing_test_msg
+      assert output =~ "3 tests, 1 failure"
+      refute output =~ "excluded"
+
+      output = mix(["test", "--only-failures"])
+
+      refute output =~ loading_only_passing_test_msg
+      assert output =~ "2 tests, 1 failure, 1 excluded"
+    end
+  end
+
   test "logs test absence for a project with no test paths" do
     in_fixture "test_stale", fn ->
       File.rm_rf!("test")

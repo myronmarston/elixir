@@ -8,7 +8,6 @@ defmodule ExUnit.RunnerStatsTest do
   import ExUnit.TestHelpers, only: [in_tmp: 2]
 
   @manifest_path "manifests"
-  @manifest_file "#{@manifest_path}/.ex_unit_results.elixir"
 
   describe "stats tracking" do
     test "counts total, failures, skipped, and excluded tests" do
@@ -59,10 +58,11 @@ defmodule ExUnit.RunnerStatsTest do
           simulate_test(formatter, :test_2, :failed)
         end)
 
-        assert read_and_sort_manifest() == [
-                 {{TestModule, :test_1}, entry(file: __ENV__.file, last_run_status: :passed)},
-                 {{TestModule, :test_2}, entry(file: __ENV__.file, last_run_status: :failed)}
-               ]
+        assert read_and_sort_manifest() ==
+                 manifest([
+                   {{TestModule, :test_1}, entry(file: __ENV__.file, last_run_status: :passed)},
+                   {{TestModule, :test_2}, entry(file: __ENV__.file, last_run_status: :failed)}
+                 ])
       end)
     end
 
@@ -71,10 +71,11 @@ defmodule ExUnit.RunnerStatsTest do
         simulate_suite(&simulate_test(&1, :test_1, :passed))
         simulate_suite(&simulate_test(&1, :test_2, :failed))
 
-        assert read_and_sort_manifest() == [
-                 {{TestModule, :test_1}, entry(file: __ENV__.file, last_run_status: :passed)},
-                 {{TestModule, :test_2}, entry(file: __ENV__.file, last_run_status: :failed)}
-               ]
+        assert read_and_sort_manifest() ==
+                 manifest([
+                   {{TestModule, :test_1}, entry(file: __ENV__.file, last_run_status: :passed)},
+                   {{TestModule, :test_2}, entry(file: __ENV__.file, last_run_status: :failed)}
+                 ])
       end)
     end
 
@@ -127,6 +128,10 @@ defmodule ExUnit.RunnerStatsTest do
   defp state_for(:excluded), do: {:excluded, "reason"}
 
   defp read_and_sort_manifest do
-    @manifest_file |> Manifest.read() |> Enum.sort()
+    @manifest_path |> Manifest.read() |> Map.update!(:entries, &Enum.sort/1)
+  end
+
+  defp manifest(entries) do
+    %ExUnit.Manifest{entries: entries, dir: @manifest_path}
   end
 end
