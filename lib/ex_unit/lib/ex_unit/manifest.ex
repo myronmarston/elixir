@@ -6,7 +6,8 @@ defmodule ExUnit.Manifest do
   defrecord :entry, [:last_run_status, :file]
   defstruct entries: [], dir: nil
 
-  @opaque t :: %__MODULE__{entries: [{test_id, entry}], dir: Path.t()}
+  @opaque entries :: [{test_id, entry}]
+  @type t :: %__MODULE__{entries: entries, dir: Path.t()}
   @type status :: :passed | :failed
   @type entry :: record(:entry, last_run_status: status, file: Path.t())
   @type test_id :: {module, name :: atom}

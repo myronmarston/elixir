@@ -98,7 +98,7 @@ defmodule ExUnit.RunnerStatsTest do
     end
   end
 
-  defp simulate_suite(opts \\ [manifest_path: @manifest_path], fun) do
+  defp simulate_suite(opts \\ [manifest: Manifest.read(@manifest_path)], fun) do
     {:ok, pid} = GenServer.start_link(RunnerStats, opts)
     GenServer.cast(pid, {:suite_started, opts})
 

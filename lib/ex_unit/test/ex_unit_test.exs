@@ -156,37 +156,48 @@ defmodule ExUnitTest do
     end
 
     in_tmp(context.test, fn ->
-      ExUnit.configure(manifest_path: Path.join(File.cwd!(), "manifests"))
+      run_with_manifest_and_filter = fn filters, cases ->
+        ExUnit.configure(manifest: ExUnit.Manifest.read(Path.join(File.cwd!(), "manifests")))
+        run_with_filter(filters, cases)
+      end
 
       # Empty because it is already loaded
-      {result, output} = run_with_filter([], [])
+      {result, output} = run_with_manifest_and_filter.([], [])
       assert result == %{failures: 1, skipped: 0, total: 4, excluded: 0}
       assert output =~ "4 tests, 1 failure"
 
-      {result, output} = run_with_filter([exclude: [even: true]], [ParityTest])
+      {result, output} = run_with_manifest_and_filter.([exclude: [even: true]], [ParityTest])
       assert result == %{failures: 0, skipped: 0, excluded: 1, total: 4}
       assert output =~ "4 tests, 0 failures, 1 excluded"
 
-      {result, output} = run_with_filter([exclude: :even], [ParityTest])
+      {result, output} = run_with_manifest_and_filter.([exclude: :even], [ParityTest])
       assert result == %{failures: 0, skipped: 0, excluded: 3, total: 4}
       assert output =~ "4 tests, 0 failures, 3 excluded"
 
-      {result, output} = run_with_filter([exclude: :even, include: [even: true]], [ParityTest])
+      {result, output} =
+        run_with_manifest_and_filter.([exclude: :even, include: [even: true]], [ParityTest])
+
       assert result == %{failures: 1, skipped: 0, excluded: 2, total: 4}
       assert output =~ "4 tests, 1 failure, 2 excluded"
 
-      {result, output} = run_with_filter([exclude: :test, include: [even: true]], [ParityTest])
+      {result, output} =
+        run_with_manifest_and_filter.([exclude: :test, include: [even: true]], [ParityTest])
+
       assert result == %{failures: 1, skipped: 0, excluded: 3, total: 4}
       assert output =~ "4 tests, 1 failure, 3 excluded"
 
       {result, output} =
-        run_with_filter([exclude: :test, include: [last_run_status: :failed]], [ParityTest])
+        run_with_manifest_and_filter.([exclude: :test, include: [last_run_status: :failed]], [
+          ParityTest
+        ])
 
       assert result == %{failures: 1, skipped: 0, excluded: 3, total: 4}
       assert output =~ "4 tests, 1 failure, 3 excluded"
 
       {result, output} =
-        run_with_filter([exclude: :test, include: [last_run_status: :passed]], [ParityTest])
+        run_with_manifest_and_filter.([exclude: :test, include: [last_run_status: :passed]], [
+          ParityTest
+        ])
 
       assert result == %{failures: 0, skipped: 0, excluded: 1, total: 4}
       assert output =~ "4 tests, 0 failures, 1 excluded"

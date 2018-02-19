@@ -266,7 +266,7 @@ defmodule Mix.Tasks.Test do
     matched_test_files =
       test_files
       |> Mix.Utils.extract_files(test_pattern)
-      |> filter_test_files_based_on_opts(opts)
+      |> filter_test_files_using_manifest(opts[:only_failures], ex_unit_opts[:manifest])
 
     display_warn_test_pattern(test_files, test_pattern, matched_test_files, warn_test_pattern)
 
@@ -317,21 +317,15 @@ defmodule Mix.Tasks.Test do
     end
   end
 
-  defp filter_test_files_based_on_opts(files, opts) do
-    if opts[:only_failures] do
-      # Strictly speaking, we don't have to filter the files to satisfy the user's
-      # request to run only failures, but the test run will finish faster if we
-      # avoid loading files that have no failures, so we filter them here.
-      files_with_failures =
-        Mix.Project.manifest_path()
-        |> ExUnit.Manifest.read()
-        |> ExUnit.Manifest.get_files_with_failures()
-
-      Enum.filter(files, &MapSet.member?(files_with_failures, Path.expand(&1)))
-    else
-      files
-    end
+  defp filter_test_files_using_manifest(files, true, manifest) do
+    # Strictly speaking, we don't have to filter the files to satisfy the user's
+    # request to run only failures, but the test run will finish faster if we
+    # avoid loading files that have no failures, so we filter them here.
+    files_with_failures = ExUnit.Manifest.get_files_with_failures(manifest)
+    Enum.filter(files, &MapSet.member?(files_with_failures, Path.expand(&1)))
   end
+
+  defp filter_test_files_using_manifest(files, _only_failures, _manifest), do: files
 
   defp display_warn_test_pattern(test_files, test_pattern, matched_test_files, warn_test_pattern) do
     files = Mix.Utils.extract_files(test_files, warn_test_pattern) -- matched_test_files
@@ -353,7 +347,7 @@ defmodule Mix.Tasks.Test do
     :formatters,
     :colors,
     :slowest,
-    :manifest_path
+    :manifest
   ]
 
   @doc false
@@ -444,7 +438,8 @@ defmodule Mix.Tasks.Test do
   end
 
   defp manifest_opts(opts) do
-    Keyword.put(opts, :manifest_path, Mix.Project.manifest_path())
+    manifest = ExUnit.Manifest.read(Mix.Project.manifest_path())
+    Keyword.put(opts, :manifest, manifest)
   end
 
   defp color_opts(opts) do

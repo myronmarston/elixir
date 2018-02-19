@@ -15,16 +15,19 @@ defmodule ExUnit.RunnerStats do
   # Callbacks
 
   def init(opts) do
-    manifest_path = Keyword.get(opts, :manifest_path)
-    send(self(), {:load_old_manifest, manifest_path})
+    {old_manifest, new_manifest} =
+      case Keyword.fetch(opts, :manifest) do
+        :error -> {nil, nil}
+        {:ok, old_manifest} -> {old_manifest, Manifest.new(old_manifest.dir)}
+      end
 
     state = %{
       total: 0,
       failures: 0,
       skipped: 0,
       excluded: 0,
-      old_manifest: nil,
-      new_manifest: Manifest.new(manifest_path)
+      old_manifest: old_manifest,
+      new_manifest: new_manifest
     }
 
     {:ok, state}
@@ -46,9 +49,9 @@ defmodule ExUnit.RunnerStats do
   def handle_cast({:test_finished, %Test{} = test}, state) do
     state =
       state
-      |> Map.update!(:new_manifest, &Manifest.add_test(&1, test))
       |> Map.update!(:total, &(&1 + 1))
       |> increment_status_counter(test.state)
+      |> record_test(test)
 
     {:noreply, state}
   end
@@ -72,12 +75,6 @@ defmodule ExUnit.RunnerStats do
     {:noreply, state}
   end
 
-  def handle_info({:load_old_manifest, dir}, %{old_manifest: nil} = state)
-      when is_binary(dir) do
-    state = %{state | old_manifest: Manifest.read(dir)}
-    {:noreply, state}
-  end
-
   def handle_info(_, state) do
     {:noreply, state}
   end
@@ -95,4 +92,10 @@ defmodule ExUnit.RunnerStats do
   end
 
   defp increment_status_counter(state, _), do: state
+
+  defp record_test(%{new_manifest: nil} = state, _test), do: state
+
+  defp record_test(state, test) do
+    update_in(state.new_manifest, &Manifest.add_test(&1, test))
+  end
 end
