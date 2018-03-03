@@ -25,7 +25,7 @@ defmodule ExUnit.ManifestTest do
       assert add_test(new(), test) == new()
     end
 
-    test "stores passed tests, keyed by module and name" do
+    test "ignores passed tests since we only care about failed tests" do
       test = %ExUnit.Test{
         state: nil,
         module: SomeMod,
@@ -33,9 +33,7 @@ defmodule ExUnit.ManifestTest do
         tags: %{file: "file"}
       }
 
-      assert add_test(new(), test) == [
-               {{SomeMod, :t1}, entry(last_run_status: :passed, file: "file")}
-             ]
+      assert add_test(new(), test) == new()
     end
 
     test "stores failed tests, keyed by module and name" do
@@ -47,7 +45,7 @@ defmodule ExUnit.ManifestTest do
       }
 
       assert add_test(new(), test) == [
-               {{SomeMod, :t1}, entry(last_run_status: :failed, file: "file")}
+               {{SomeMod, :t1}, "file"}
              ]
     end
 
@@ -60,7 +58,7 @@ defmodule ExUnit.ManifestTest do
       }
 
       assert add_test(new(), test) == [
-               {{SomeMod, :t1}, entry(last_run_status: :failed, file: "file")}
+               {{SomeMod, :t1}, "file"}
              ]
     end
   end
@@ -138,20 +136,20 @@ defmodule ExUnit.ManifestTest do
     end
 
     test "returns the new manifest when the old manifest is blank" do
-      new_manifest = [{{TestMod1, :test_1}, entry()}]
+      new_manifest = [{{TestMod1, :test_1}, "file"}]
 
       assert merge_and_sort(new(), new_manifest) == new_manifest
     end
 
     test "replaces old entries with their updated status" do
       old_manifest = [
-        {{TestMod1, :test_1}, entry(last_run_status: :failed, file: @existing_file_1)},
-        {{TestMod1, :test_2}, entry(last_run_status: :passed, file: @existing_file_1)}
+        {{TestMod1, :test_1}, @existing_file_1},
+        {{TestMod1, :test_2}, @existing_file_1}
       ]
 
       new_manifest = [
-        {{TestMod1, :test_1}, entry(last_run_status: :passed, file: @existing_file_1)},
-        {{TestMod1, :test_2}, entry(last_run_status: :failed, file: @existing_file_1)}
+        {{TestMod1, :test_1}, @existing_file_1},
+        {{TestMod1, :test_2}, @existing_file_1}
       ]
 
       assert merge_and_sort(old_manifest, new_manifest) == new_manifest
@@ -159,70 +157,70 @@ defmodule ExUnit.ManifestTest do
 
     test "keeps old entries for test modules in existing files that were not part of this run" do
       old_manifest = [
-        {{UnknownMod1, :test_1}, entry(last_run_status: :failed, file: @existing_file_1)},
-        {{UnknownMod1, :test_2}, entry(last_run_status: :passed, file: @existing_file_1)}
+        {{UnknownMod1, :test_1}, @existing_file_1},
+        {{UnknownMod1, :test_2}, @existing_file_1}
       ]
 
       new_manifest = [
-        {{TestMod2, :test_1}, entry(last_run_status: :passed, file: @existing_file_2)},
-        {{TestMod2, :test_2}, entry(last_run_status: :failed, file: @existing_file_2)}
+        {{TestMod2, :test_1}, @existing_file_2},
+        {{TestMod2, :test_2}, @existing_file_2}
       ]
 
       assert merge_and_sort(old_manifest, new_manifest) == [
-               {{TestMod2, :test_1}, entry(last_run_status: :passed, file: @existing_file_2)},
-               {{TestMod2, :test_2}, entry(last_run_status: :failed, file: @existing_file_2)},
-               {{UnknownMod1, :test_1}, entry(last_run_status: :failed, file: @existing_file_1)},
-               {{UnknownMod1, :test_2}, entry(last_run_status: :passed, file: @existing_file_1)}
+               {{TestMod2, :test_1}, @existing_file_2},
+               {{TestMod2, :test_2}, @existing_file_2},
+               {{UnknownMod1, :test_1}, @existing_file_1},
+               {{UnknownMod1, :test_2}, @existing_file_1}
              ]
     end
 
     test "keeps old entries for tests that were loaded but skipped as part of this run" do
       old_manifest = [
-        {{TestMod1, :test_1}, entry(last_run_status: :failed, file: @existing_file_1)},
-        {{TestMod1, :test_2}, entry(last_run_status: :passed, file: @existing_file_1)}
+        {{TestMod1, :test_1}, @existing_file_1},
+        {{TestMod1, :test_2}, @existing_file_1}
       ]
 
       new_manifest = [
-        {{TestMod1, :test_1}, entry(last_run_status: :passed, file: @existing_file_1)}
+        {{TestMod1, :test_1}, @existing_file_1}
       ]
 
       assert merge_and_sort(old_manifest, new_manifest) == [
-               {{TestMod1, :test_1}, entry(last_run_status: :passed, file: @existing_file_1)},
-               {{TestMod1, :test_2}, entry(last_run_status: :passed, file: @existing_file_1)}
+               {{TestMod1, :test_1}, @existing_file_1},
+               {{TestMod1, :test_2}, @existing_file_1}
              ]
     end
 
     test "drops old entries from test files that no longer exist" do
       old_manifest = [
-        {{TestMod2, :test_1}, entry(last_run_status: :failed, file: @missing_file)},
-        {{TestMod2, :test_2}, entry(last_run_status: :passed, file: @missing_file)}
+        {{TestMod2, :test_1}, @missing_file},
+        {{TestMod2, :test_2}, @missing_file}
       ]
 
       new_manifest = [
-        {{TestMod1, :test_1}, entry(last_run_status: :passed, file: @existing_file_1)},
-        {{TestMod1, :test_2}, entry(last_run_status: :failed, file: @existing_file_1)}
+        {{TestMod1, :test_1}, @existing_file_1},
+        {{TestMod1, :test_2}, @existing_file_1}
       ]
 
       assert merge_and_sort(old_manifest, new_manifest) == [
-               {{TestMod1, :test_1}, entry(last_run_status: :passed, file: @existing_file_1)},
-               {{TestMod1, :test_2}, entry(last_run_status: :failed, file: @existing_file_1)}
+               {{TestMod1, :test_1}, @existing_file_1},
+               {{TestMod1, :test_2}, @existing_file_1}
              ]
     end
 
     test "drops old entries for deleted tests from loaded modules" do
       old_manifest = [
-        {{TestMod2, :missing_1}, entry(last_run_status: :failed, file: @existing_file_1)},
-        {{TestMod2, :missing_2}, entry(last_run_status: :passed, file: @existing_file_2)}
+        {{TestMod2, :missing_1}, @existing_file_1},
+        {{TestMod2, :missing_2}, @existing_file_2}
       ]
 
       new_manifest = [
-        {{TestMod1, :test_1}, entry(last_run_status: :passed, file: @existing_file_1)},
-        {{TestMod1, :test_2}, entry(last_run_status: :failed, file: @existing_file_1)}
+        {{TestMod1, :test_1}, @existing_file_1},
+        {{TestMod1, :test_2}, @existing_file_1}
       ]
 
       assert merge_and_sort(old_manifest, new_manifest) == [
-               {{TestMod1, :test_1}, entry(last_run_status: :passed, file: @existing_file_1)},
-               {{TestMod1, :test_2}, entry(last_run_status: :failed, file: @existing_file_1)}
+               {{TestMod1, :test_1}, @existing_file_1},
+               {{TestMod1, :test_2}, @existing_file_1}
              ]
     end
   end

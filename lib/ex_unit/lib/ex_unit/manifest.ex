@@ -1,13 +1,8 @@
 defmodule ExUnit.Manifest do
   @moduledoc false
 
-  import Record
-
-  defrecord :entry, [:last_run_status, :file]
-  @opaque t :: [{test_id, entry}]
-  @type status :: :passed | :failed
-  @type entry :: record(:entry, last_run_status: status, file: Path.t())
   @type test_id :: {module, name :: atom}
+  @opaque t :: [{test_id, Path.t()}]
 
   @manifest_vsn 1
 
@@ -25,16 +20,11 @@ defmodule ExUnit.Manifest do
       when ignored_state in [:skipped, :excluded],
       do: manifest
 
-  def add_test(manifest, %ExUnit.Test{} = test) do
-    status =
-      case test.state do
-        nil -> :passed
-        {:failed, _} -> :failed
-        {:invalid, _} -> :failed
-      end
+  def add_test(manifest, %ExUnit.Test{state: nil}), do: manifest
 
-    entry = entry(last_run_status: status, file: test.tags.file)
-    [{{test.module, test.name}, entry} | manifest]
+  def add_test(manifest, %ExUnit.Test{state: {failed_state, _}} = test)
+      when failed_state in [:failed, :invalid] do
+    [{{test.module, test.name}, test.tags.file} | manifest]
   end
 
   @spec write!(t, Path.t()) :: :ok
@@ -83,7 +73,7 @@ defmodule ExUnit.Manifest do
   defp prune_and_merge([], _, _, acc), do: acc
 
   defp prune_and_merge([head | tail] = all, new_manifest, file_existence, acc) do
-    {{mod, name} = key, entry(file: file)} = head
+    {{mod, name} = key, file} = head
     file_exists = Map.fetch(file_existence, file)
 
     cond do

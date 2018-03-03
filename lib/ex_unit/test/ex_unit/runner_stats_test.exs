@@ -4,7 +4,6 @@ defmodule ExUnit.RunnerStatsTest do
   use ExUnit.Case, async: false
 
   alias ExUnit.{Manifest, RunnerStats}
-  import Manifest, only: [entry: 1]
   import ExUnit.TestHelpers, only: [in_tmp: 2]
 
   @manifest_file "ex_unit_manifest.elixir"
@@ -46,25 +45,25 @@ defmodule ExUnit.RunnerStatsTest do
     test "records the test results in the manifest file", context do
       in_tmp(context.test, fn ->
         simulate_suite(fn formatter ->
-          simulate_test(formatter, :test_1, :passed)
+          simulate_test(formatter, :test_1, :failed)
           simulate_test(formatter, :test_2, :failed)
         end)
 
         assert read_and_sort_manifest() == [
-                 {{TestModule, :test_1}, entry(file: __ENV__.file, last_run_status: :passed)},
-                 {{TestModule, :test_2}, entry(file: __ENV__.file, last_run_status: :failed)}
+                 {{TestModule, :test_1}, __ENV__.file},
+                 {{TestModule, :test_2}, __ENV__.file}
                ]
       end)
     end
 
     test "merges the results with the results from the prior run", context do
       in_tmp(context.test, fn ->
-        simulate_suite(&simulate_test(&1, :test_1, :passed))
+        simulate_suite(&simulate_test(&1, :test_1, :failed))
         simulate_suite(&simulate_test(&1, :test_2, :failed))
 
         assert read_and_sort_manifest() == [
-                 {{TestModule, :test_1}, entry(file: __ENV__.file, last_run_status: :passed)},
-                 {{TestModule, :test_2}, entry(file: __ENV__.file, last_run_status: :failed)}
+                 {{TestModule, :test_1}, __ENV__.file},
+                 {{TestModule, :test_2}, __ENV__.file}
                ]
       end)
     end
